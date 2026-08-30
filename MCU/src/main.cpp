@@ -301,6 +301,17 @@ static void Task_Network(void *pvParameters) {
             }
         }
 
+        if (mqttHandler.hasCommand()) {
+            ManualCommand_t cmd = mqttHandler.getCommand();
+            if (xQueueSend(cmdQueue, &cmd, 0) == pdTRUE) {
+                setSystemMode(MANUAL_MODE);
+                xEventGroupSetBits(sysEvents, EVT_MANUAL_ACTIVE);
+                xTimerReset(manualTimer, portMAX_DELAY);
+                xTimerStart(manualTimer, portMAX_DELAY);
+                Serial.printf("Manual command received: duty=%u%%\n", cmd.duty_pct);
+            }
+        }
+
         if (mqttHandler.isConnected() &&
             xQueueReceive(sensorQueue, &lastTelemetryData, 0) == pdTRUE &&
             lastTelemetryData.valid &&

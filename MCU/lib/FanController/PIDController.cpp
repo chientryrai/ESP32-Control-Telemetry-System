@@ -15,17 +15,21 @@ PIDController::PIDController(float kp, float ki, float kd,
 PIDController::~PIDController() {}
 
 float PIDController::compute(float setpoint, float processVariable, float dt) {
+    uint32_t now = millis();
 
-    if (_firstRun || dt <= 0.0f) {
+    if (_firstRun) {
         _firstRun = false;
-        _lastTime = millis();
-        return 0.0f;  // Return 0 on first call to avoid derivative spike
+        _lastTime = now;
+        _lastError = processVariable;
+        return 0.0f;
     }
 
-    uint32_t now = millis();
-    float deltaTime = (now - _lastTime) / 1000.0f;  // Convert to seconds
+    float deltaTime = dt;
+    if (deltaTime <= 0.0f) {
+        deltaTime = (now - _lastTime) / 1000.0f;
+    }
 
-    if (deltaTime < 0.001f) {
+    if (deltaTime <= 0.001f) {
         deltaTime = 0.001f;
     }
 
@@ -37,14 +41,15 @@ float PIDController::compute(float setpoint, float processVariable, float dt) {
     _integral = constrain(_integral, _integralMin, _integralMax);
     float iTerm = _integral;
 
-    float dTerm = -_kd * (processVariable - _lastError) / deltaTime;
+    float derivativeError = processVariable - _lastError;
+    float dTerm = -_kd * (derivativeError / deltaTime);
     _lastError = processVariable;
 
     float output = pTerm + iTerm + dTerm;
     output = constrain(output, _outputMin, _outputMax);
 
     _lastTime = now;
-    
+
     return output;
 }
 
