@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../../test"
+		},
+		{
+			"name": "ESP32-Control-Telemetry-System",
+			"path": ".."
+		}
+	],
+	"settings": {}
+}
