@@ -33,7 +33,8 @@ float PIDController::compute(float setpoint, float processVariable, float dt) {
         deltaTime = 0.001f;
     }
 
-    float error = setpoint - processVariable;
+    // Quạt làm mát: error = nhiệt độ hiện tại - target (c dương nghĩa nhiệt độ cao hơn target)
+    float error = processVariable - setpoint;
 
     float pTerm = _kp * error;
 
@@ -42,7 +43,7 @@ float PIDController::compute(float setpoint, float processVariable, float dt) {
     float iTerm = _integral;
 
     float derivativeError = processVariable - _lastError;
-    float dTerm = -_kd * (derivativeError / deltaTime);
+    float dTerm = _kd * (derivativeError / deltaTime);  // bỏ dấu trừ (cùng chiều với error)
     _lastError = processVariable;
 
     float output = pTerm + iTerm + dTerm;

@@ -214,7 +214,7 @@ static void Task_FanControl(void *pvParameters) {
 
     static PIDController fanPID(2.0f, 0.5f, 1.0f, 0.0f, 100.0f);
     static uint32_t lastPIDTime = 0;
-    const float TARGET_TEMP = 25.0f;
+    static float targetTemp = TARGET_TEMP_DEFAULT_C;
 
     for (;;) {
         EventBits_t bits = xEventGroupGetBits(sysEvents);
@@ -236,10 +236,21 @@ static void Task_FanControl(void *pvParameters) {
                 float dutyCycle = 0.0f;
 
                 switch (g_sys.current_mode) {
-                    case AUTO_MODE:
-                        dutyCycle = fanPID.compute(TARGET_TEMP, data.temperature_c);
-                        g_sys.fan_duty_pct = (uint8_t)constrain(dutyCycle, 0.0f, 100.0f);
-                        break;
+                    case AUTO_MODE: {
+                float raw = fanPID.compute(targetTemp, data.temperature_c);
+
+                uint8_t duty;
+                if (raw <= 0.5f) {
+                    duty = 0;                       // không cần làm mát -> tắt hẳn
+                } else if (raw < FAN_STALL_DUTY_PCT) {
+                    duty = FAN_STALL_DUTY_PCT;      // ép lên sàn để quạt chắc chắn quay, tránh "stall"
+                } else {
+                    duty = (uint8_t)constrain(raw, 0.0f, 100.0f);
+                }
+
+                g_sys.fan_duty_pct = duty;
+                break;
+            }
 
                     case MANUAL_MODE:
                         if (xQueueReceive(cmdQueue, &manualCmd, 0) == pdTRUE) {
@@ -250,16 +261,16 @@ static void Task_FanControl(void *pvParameters) {
                         break;
 
                     case SAFE_MODE:
-                        g_sys.fan_duty_pct = FAN_SAFE_DUTY_PCT;
+                        g_sys.fan_duty_pct = FAN_STALL_DUTY_PCT;
                         break;
 
                     case EMERGENCY_MODE:
-                        g_sys.fan_duty_pct = FAN_MAX_DUTY_PCT;
+                        g_sys.fan_duty_pct = FAN_STALL_DUTY_PCT * 2;
                         break;
 
                     case INIT_MODE:
                     default:
-                        g_sys.fan_duty_pct = FAN_MIN_DUTY_PCT;
+                        g_sys.fan_duty_pct = FAN_STALL_DUTY_PCT;
                         break;
                 }
             }
