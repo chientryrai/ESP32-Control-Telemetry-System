@@ -261,16 +261,16 @@ static void Task_FanControl(void *pvParameters) {
                         break;
 
                     case SAFE_MODE:
-                        g_sys.fan_duty_pct = FAN_STALL_DUTY_PCT;
+                        g_sys.fan_duty_pct = FAN_SAFE_DUTY_PCT;
                         break;
 
                     case EMERGENCY_MODE:
-                        g_sys.fan_duty_pct = FAN_STALL_DUTY_PCT * 2;
+                        g_sys.fan_duty_pct = FAN_MAX_DUTY_PCT;
                         break;
 
                     case INIT_MODE:
                     default:
-                        g_sys.fan_duty_pct = FAN_STALL_DUTY_PCT;
+                        g_sys.fan_duty_pct = FAN_MIN_DUTY_PCT;
                         break;
                 }
             }

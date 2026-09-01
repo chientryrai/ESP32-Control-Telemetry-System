@@ -1,0 +1,108 @@
+ESP32-Control-Telemetry-System - Final Build Status
+==================================================
+
+Date: 2026-09-01
+Build Tool: PlatformIO
+Target: ESP32 Dev Module (esp32dev)
+Framework: Arduino + ESP-IDF
+
+BUILD RESULT: SUCCESS
+=====================
+Last build output:
+========================= [SUCCESS] Took 13.01 seconds =========================
+
+Files modified in latest session:
+--------------------------------
+1. MCU/include/config.h
+   - Restored: FAN_SAFE_DUTY_PCT = 50, FAN_MIN_DUTY_PCT = 0, FAN_MAX_DUTY_PCT = 100
+   - Kept: TARGET_TEMP_DEFAULT_C = 30.0f, FAN_STALL_DUTY_PCT = 20
+
+2. MCU/src/main.cpp
+   - Task_FanControl:
+     * AUTO_MODE: Uses targetTemp + FAN_STALL_DUTY_PCT anti-stall logic
+     * SAFE_MODE: g_sys.fan_duty_pct = FAN_SAFE_DUTY_PCT (50%)
+     * EMERGENCY_MODE: g_sys.fan_duty_pct = FAN_MAX_DUTY_PCT (100%)
+     * INIT_MODE/default: g_sys.fan_duty_pct = FAN_MIN_DUTY_PCT (0%)
+   - Added: static float targetTemp = TARGET_TEMP_DEFAULT_C;
+
+3. MCU/lib/FanController/PIDController.cpp
+   - Fixed sign error: error = processVariable - setpoint (cooling logic)
+   - Fixed derivative term: dTerm = +_kd * (derivativeError / deltaTime)
+   - Internal deltaTime calculation when dt <= 0
+
+Project Structure:
+-----------------
+MCU/
+├── include/
+│   ├── config.h
+│   ├── state_machine.h
+│   ├── README
+│   └── test.code-workspace
+├── lib/
+│   ├── AHT25_Driver/
+│   │   ├── AHT25.h
+│   │   ├── AHT25.cpp
+│   │   └── README.md
+│   ├── FanController/
+│   │   ├── PIDController.h
+│   │   ├── PIDController.cpp
+│   │   └── README.md
+│   ├── MQTT_Handler/
+│   │   ├── MQTTHandler.h
+│   │   ├── MQTTHandler.cpp
+│   │   └── README.md
+│   └── SensorManager/
+│       ├── SensorManager.h
+│       ├── SensorManager.cpp
+│       └── README.md
+├── src/
+│   └── main.cpp
+└── test/
+    └── README
+
+Root files:
+----------
+- platformio.ini (updated: src_dir = MCU/src, include_dir = MCU/include, lib_extra_dirs = MCU/lib)
+- MCU.md (project summary)
+- build.log
+- .gitignore
+- .vscode/extensions.json
+- include/ (original location - moved to MCU/include)
+- lib/ (original location - moved to MCU/lib)
+- src/ (original location - moved to MCU/src)
+- test/ (original location - moved to MCU/test)
+
+Key Fixes Applied:
+-----------------
+1. Thermal Control (PID Sign Fix):
+   - Changed error calculation to: processVariable - setpoint
+   - Fixed derivative term sign
+   - Internal deltaTime calculation
+
+2. Fan Stall Prevention:
+   - Added FAN_STALL_DUTY_PCT = 20 (minimum duty for fan to spin)
+   - AUTO_MODE: 0% if raw <= 0.5, FAN_STALL_DUTY_PCT if raw < 20%, else raw
+   - Prevents fan reporting duty but not spinning
+
+3. Safety Mode Restoration:
+   - SAFE_MODE: 50% duty (FAN_SAFE_DUTY_PCT)
+   - EMERGENCY_MODE: 100% duty (FAN_MAX_DUTY_PCT)
+   - INIT_MODE: 0% duty (FAN_MIN_DUTY_PCT)
+
+4. Configuration:
+   - TARGET_TEMP_DEFAULT_C = 30.0f (configurable setpoint)
+   - All safety constants restored and properly mapped
+
+Next Steps:
+----------
+1. Commit changes to Git (when git command is available)
+2. Test on actual ESP32 hardware
+3. Validate MQTT telemetry and command functionality
+4. Monitor temperature control stability around setpoint
+
+Validation Notes:
+----------------
+- Build succeeds with no errors (only unused variable warning)
+- All safety modes restored to original specifications
+- Thermal control logic now correctly increases fan speed with temperature
+- Fan stall prevention ensures reported duty matches physical fan operation

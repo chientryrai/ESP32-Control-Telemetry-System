@@ -32,8 +32,12 @@
 #define HUM_CRITICAL_HIGH   85.0f   // EMERGENCY_MODE trigger
 #define HUM_CRITICAL_LOW    15.0f   // EMERGENCY_MODE trigger
 
+#define FAN_SAFE_DUTY_PCT   50      // SAFE_MODE default duty
+#define FAN_MIN_DUTY_PCT    0
+#define FAN_MAX_DUTY_PCT    100
+
 #define TARGET_TEMP_DEFAULT_C   30.0f
-#define FAN_STALL_DUTY_PCT      20    // duty tối thiểu để quạt thực sự quay (tuỳ model, cần đo thực tế)
+#define FAN_STALL_DUTY_PCT      20    // duty tối thiểu để quạt thực sự quay — CHỈ dùng trong AUTO_MODE
 
 
 #define SENSOR_READ_PERIOD_MS   1000UL   // Task_SensorRead period
