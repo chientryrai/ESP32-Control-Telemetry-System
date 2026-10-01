@@ -24,7 +24,8 @@ mqtt.update();
 // Publish telemetry:
 if (mqtt.isConnected()) {
     SensorData_t data = getSensorData();
-    mqtt.publishTelemetry(data);
+  mqtt.publishTelemetry(data, fanDutyPct, fanRpm, targetTemperature,
+              mode, alarm, shutdown);
 }
 
 // Check for commands:
@@ -43,11 +44,17 @@ if (mqtt.hasCommand()) {
 **Telemetry (published):**
 ```json
 {
+  "device_id": "esp32-fan-controller",
+  "timestamp": 1234567,
   "temperature": 25.5,
   "humidity": 60.2,
-  "timestamp": 1234567,
-  "valid": true,
-  "device_id": "esp32-fan-controller"
+  "fan_duty": 75,
+  "fan_rpm": 1800,
+  "mode": "MANUAL",
+  "alarm": false,
+  "shutdown": false,
+  "target_temperature": 30.0,
+  "sensor_valid": true
 }
 ```
 

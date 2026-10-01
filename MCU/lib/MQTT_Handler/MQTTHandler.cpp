@@ -2,8 +2,9 @@
 
 #include "MQTTHandler.h"
 
+// Constructor: khởi tạo các field cần thiết cho kết nối WiFi/MQTT và giữ giá trị mặc định an toàn.
 MQTTHandler::MQTTHandler()
-    : _wifiClient(), 
+    : _wifiClient(),
       _mqttClient(_wifiClient),
       _wifiConnected(false),
       _mqttConnected(false),
@@ -22,6 +23,7 @@ MQTTHandler::MQTTHandler()
     _alertTopic = MQTT_TOPIC_ALERT;
 }
 
+// Destructor: đóng MQTT nếu đang kết nối và ngắt WiFi khi hệ thống tắt.
 MQTTHandler::~MQTTHandler() {
     if (_mqttClient.connected()) {
         _mqttClient.disconnect();
@@ -29,37 +31,43 @@ MQTTHandler::~MQTTHandler() {
     WiFi.disconnect();
 }
 
+// begin(): chuẩn bị client WiFi và MQTT, đặt callback nhận message.
 bool MQTTHandler::begin() {
     Serial.println("Starting MQTT Handler...");
 
     WiFi.mode(WIFI_STA);
-    WiFi.begin(_ssid, _password);
-    Serial.print("Connecting to WiFi...");
+    if (!connectWiFi()) {
+        Serial.println("WiFi not connected at startup");
+    }
 
     _mqttClient.setServer(_mqttServer, _mqttPort);
     _mqttClient.setCallback([this](char* topic, byte* payload, unsigned int length) {
         this->mqttCallback(topic, payload, length);
     });
-    
+
     return true;
 }
 
+// update(): kiểm tra trạng thái WiFi và MQTT định kỳ, reconnect nếu cần và giữ loop MQTT sống.
 void MQTTHandler::update() {
+    if (!_wifiConnected) {
+        connectWiFi();
+    }
 
-    if (!_wifiConnected && WiFi.status() == WL_CONNECTED) {
-        _wifiConnected = true;
-        Serial.println("\nWiFi connected");
-        Serial.print("IP address: ");
-        Serial.println(WiFi.localIP());
-    } else if (_wifiConnected && WiFi.status() != WL_CONNECTED) {
+    if (!_wifiConnected) {
+        return;
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
         _wifiConnected = false;
         _mqttConnected = false;
         Serial.println("\nWiFi disconnected");
+        return;
     }
 
-    if (_wifiConnected && !_mqttConnected) {
+    if (!_mqttConnected) {
         unsigned long now = millis();
-        if (now - _lastReconnectAttempt > 5000) {  // Try every 5 seconds
+        if (now - _lastReconnectAttempt > 5000) {
             _lastReconnectAttempt = now;
             if (connectMQTT()) {
                 Serial.println("MQTT reconnected");
@@ -73,54 +81,63 @@ void MQTTHandler::update() {
     }
 
     if (_mqttConnected && (millis() - _lastTelemetryPublish > MQTT_PUBLISH_PERIOD_MS)) {
-
-
         _lastTelemetryPublish = millis();
     }
 }
 
-bool MQTTHandler::publishTelemetry(const SensorData_t &data) {
+// publishTelemetry(): chuyển SensorData_t thành JSON và gửi lên topic telemetry nếu đã kết nối MQTT.
+bool MQTTHandler::publishTelemetry(const SensorData_t &data,
+                                  uint8_t fanDutyPct,
+                                  uint16_t fanRpm,
+                                  float targetTemp,
+                                  SystemMode_t mode,
+                                  bool alarm,
+                                  bool shutdown) {
     if (!_mqttConnected) {
         return false;
     }
-    
-    String jsonPayload = createTelemetryJson(data);
+
+    String jsonPayload = createTelemetryJson(data, fanDutyPct, fanRpm, targetTemp,
+                                             mode, alarm, shutdown);
     bool result = _mqttClient.publish(_telemetryTopic, jsonPayload.c_str());
-    
+
     if (result) {
         Serial.printf("Published telemetry: %s\n", jsonPayload.c_str());
         _lastTelemetryPublish = millis();
     } else {
         Serial.println("Failed to publish telemetry");
     }
-    
+
     return result;
 }
 
+// hasCommand(): báo cho task điều khiển biết có lệnh điều khiển manual mới chưa xử lý.
 bool MQTTHandler::hasCommand() const {
     return _commandAvailable;
 }
 
+// getCommand(): trả về lệnh pending và đặt cờ commandAvailable về false để không đọc lặp lại.
 ManualCommand_t MQTTHandler::getCommand() {
     _commandAvailable = false;
     return _pendingCommand;
 }
 
+// connectWiFi(): cố gắng kết nối WiFi, nếu không thành công thì trả false.
 bool MQTTHandler::connectWiFi() {
     if (WiFi.status() == WL_CONNECTED) {
         _wifiConnected = true;
         return true;
     }
-    
+
     Serial.print("Connecting to WiFi...");
     WiFi.begin(_ssid, _password);
-    
+
     uint32_t startTime = millis();
     while (WiFi.status() != WL_CONNECTED && millis() - startTime < 10000) {
         delay(500);
         Serial.print(".");
     }
-    
+
     if (WiFi.status() == WL_CONNECTED) {
         _wifiConnected = true;
         Serial.println("\nWiFi connected");
@@ -134,11 +151,12 @@ bool MQTTHandler::connectWiFi() {
     }
 }
 
+// connectMQTT(): khi WiFi đã ổn định thì kết nối tới broker MQTT và subscribe topic lệnh.
 bool MQTTHandler::connectMQTT() {
     if (!_wifiConnected) {
         return false;
     }
-    
+
     Serial.print("Connecting to MQTT...");
     if (_mqttClient.connect(_mqttClientId)) {
         _mqttConnected = true;
@@ -149,7 +167,7 @@ bool MQTTHandler::connectMQTT() {
         } else {
             Serial.printf("Failed to subscribe to %s\n", _commandTopic);
         }
-        
+
         return true;
     } else {
         Serial.print(" failed, rc=");
@@ -159,6 +177,7 @@ bool MQTTHandler::connectMQTT() {
     }
 }
 
+// mqttCallback(): được gọi khi có message gửi tới topic lệnh, parse JSON và lưu vào _pendingCommand.
 void MQTTHandler::mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.print("Message arrived [");
     Serial.print(topic);
@@ -182,15 +201,17 @@ void MQTTHandler::mqttCallback(char* topic, byte* payload, unsigned int length) 
     }
 }
 
+// handleTelemetry(): placeholder để mở rộng cho xử lý dữ liệu telemetry theo mô hình có thể phát triển sau.
 void MQTTHandler::handleTelemetry() {
-
 
 }
 
+// handleCommands(): placeholder để xử lý các lệnh command theo logic riêng nếu sau này cần mở rộng hơn.
 void MQTTHandler::handleCommands() {
 
 }
 
+// publishAlert(): gửi cảnh báo lên topic alert nếu MQTT đang kết nối.
 void MQTTHandler::publishAlert(const char *message) {
     if (_mqttConnected) {
         _mqttClient.publish(_alertTopic, message);
@@ -198,20 +219,51 @@ void MQTTHandler::publishAlert(const char *message) {
     }
 }
 
-String MQTTHandler::createTelemetryJson(const SensorData_t &data) {
+// createTelemetryJson(): tạo payload JSON đầy đủ cho dashboard và backend.
+String MQTTHandler::createTelemetryJson(const SensorData_t &data,
+                                       uint8_t fanDutyPct,
+                                       uint16_t fanRpm,
+                                       float targetTemp,
+                                       SystemMode_t mode,
+                                       bool alarm,
+                                       bool shutdown) {
     JsonDocument doc;
 
+    const char *modeName = "INIT";
+    switch (mode) {
+        case AUTO_MODE:
+            modeName = "AUTO";
+            break;
+        case MANUAL_MODE:
+            modeName = "MANUAL";
+            break;
+        case EMERGENCY_MODE:
+            modeName = "EMERGENCY";
+            break;
+        case INIT_MODE:
+        default:
+            modeName = "INIT";
+            break;
+    }
+
+    doc["device_id"] = _mqttClientId;
+    doc["timestamp"] = millis();
     doc["temperature"] = data.temperature_c;
     doc["humidity"] = data.humidity_pct;
-    doc["timestamp"] = data.timestamp_ms;
-    doc["valid"] = data.valid;
-    doc["device_id"] = _mqttClientId;
+    doc["fan_duty"] = fanDutyPct;
+    doc["fan_rpm"] = fanRpm;
+    doc["mode"] = modeName;
+    doc["alarm"] = alarm;
+    doc["shutdown"] = shutdown;
+    doc["target_temperature"] = targetTemp;
+    doc["sensor_valid"] = data.valid;
 
     char jsonBuffer[256];
     size_t n = serializeJson(doc, jsonBuffer);
     return String(jsonBuffer, n);
 }
 
+// parseCommandJson(): đọc JSON nhận được từ topic command và chuyển thành ManualCommand_t an toàn.
 bool MQTTHandler::parseCommandJson(const String &jsonString, ManualCommand_t &cmd) {
     JsonDocument doc;
     DeserializationError error = deserializeJson(doc, jsonString);

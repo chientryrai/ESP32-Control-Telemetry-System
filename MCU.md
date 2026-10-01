@@ -19,10 +19,8 @@ Dự án này là firmware cho ESP32 dùng để:
 - [src/main.cpp](src/main.cpp) — setup, task scheduler, vòng lặp chính, logic điều khiển quạt và MQTT
 
 ### Sensor
-- [lib/AHT25_Driver/AHT25.h](lib/AHT25_Driver/AHT25.h)
-- [lib/AHT25_Driver/AHT25.cpp](lib/AHT25_Driver/AHT25.cpp) — driver đọc cảm biến AHT25 qua I2C
-- [lib/SensorManager/SensorManager.h](lib/SensorManager/SensorManager.h)
-- [lib/SensorManager/SensorManager.cpp](lib/SensorManager/SensorManager.cpp) — lớp quản lý cảm biến, tổng hợp dữ liệu cho hệ thống
+- [lib/AHT20_Driver/AHT20.h](lib/AHT20_Driver/AHT20.h)
+- [lib/AHT20_Driver/AHT20.cpp](lib/AHT20_Driver/AHT20.cpp) — driver đọc cảm biến AHT25 qua I2C
 
 ### Điều khiển quạt
 - [lib/FanController/PIDController.h](lib/FanController/PIDController.h)
